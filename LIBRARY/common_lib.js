@@ -4,9 +4,9 @@
  * @NApiVersion 2.1
  * @NModuleScope SameAccount
  */
-define(['N/search', 'N/record', "N/ui/dialog", "N/format", 'N/error', 'N/email', 'N/runtime', 'N/query'],
+define(['N/search', 'N/record', "N/ui/dialog", "N/format", 'N/error', 'N/email', 'N/runtime', 'N/query', "require", "exports", "N/log", "N/sftp"],
   
-  function(search, record, dialog, format, error, email, runtime, query) {
+  function(search, record, dialog, format, error, email, runtime, query, require, exports, log, sftp) {
 	
 	/**
 	 * マスタ / トランザクション取得
@@ -112,14 +112,99 @@ define(['N/search', 'N/record', "N/ui/dialog", "N/format", 'N/error', 'N/email',
 	 * SFTPファイル受信
 	 */
 	function execute() {
-		
+		"use strict";
+	    Object.defineProperty(exports, "__esModule", { value: true });
+	    exports.execute = void 0;
+	    var NS_TEST_FOLDER = 12308; //12303; WMStoERP Copy
+	    var execute = function (ctx) {
+	        try {
+	            var conn_1 = sftp.createConnection({
+	                username: 'ftpuser',
+	                //passwordGuid: 'custsecret_hunter_test_sftp',
+	                passwordGuid: 'custsecret_hunter_sftp',
+	                url: '153.120.20.66',
+	                port: 22,
+	                //directory: '/home/ftpuser/to_ns', ///home/ftpuser/ARCHIVE
+	                directory: '/home/ftpuser/WMStoERP', // 
+	                hostKey: 'AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJgP0r0WZ7YtiS6npu+5DYgalatLx6tWmcKcDMC1NENddyYCCRY+kEKnA9o4t6RMguj2ztLxjc/LfDDOmYTwFhw=',
+	            });
+	            var rtn_1 = conn_1.list({ path: '/', sort: sftp.Sort.DATE_DESC });
+	            Object.keys(rtn_1).map(function (idx) {
+	                var _a = rtn_1[idx], directory = _a.directory, name = _a.name, size = _a.size, lastModified = _a.lastModified;
+	                if (!directory) {
+	                    var f = conn_1.download({ filename: "".concat(name) });
+	                    log.debug('file', f);
+	                    f.folder = NS_TEST_FOLDER;
+	                    f.save();
+	                }
+	            });
+	        }
+	        catch (e) {
+	            log.error('CPC:MISCS:SFTP:SKD', { e: e });
+	        }
+	    };
+	    exports.execute = execute;
 	}
 	
 	/**
 	 * SFTPファイル送信
 	 */
 	function execute() {
-		
+		"use strict";
+	    Object.defineProperty(exports, "__esModule", { value: true });
+	    exports.execute = void 0;
+	    var NS_TEST_FOLDER = 2400633;
+	    var NS_TEST_DONE_FOLDER = 18082457;
+	    var SFTP_HOST = '59.106.211.127';
+	    var SFTP_USER_NAME = 'ftpuser';
+	    var SFTP_PASS_WORD = 'aGWb6oVb';
+	    var SFTP_PASS_WORD_GUID = 'custsecret_microport_test_sftp';
+	    var SFTP_TARGET_FOLDER = '/home/ftpuser/SEND/SFTP_TEST';
+	    var SFTP_HOST_KEY = 'AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLxt8e251AohnU9ARtt7RWsmNCMG4N/LHphh1nlpu62HjlhLgy04RpztGf27Yg1xMN9oJY1woVrPDFOtq468oY0=';
+	    var execute = function (ctx) {
+	        var file_id_list = [];
+	        search
+	            .create({
+	            type: 'file',
+	            filters: [{ name: 'folder', operator: search.Operator.ANYOF, values: NS_TEST_FOLDER }],
+	        })
+	            .run()
+	            .each(function (rec) {
+	            file_id_list.push(rec.id);
+	            return true;
+	        });
+	        try {
+	            var conn_1 = sftp.createConnection({
+	                username: SFTP_USER_NAME,
+	                passwordGuid: SFTP_PASS_WORD_GUID,
+	                url: SFTP_HOST,
+	                port: 22,
+	                directory: SFTP_TARGET_FOLDER,
+	                hostKey: SFTP_HOST_KEY,
+	            });
+	            file_id_list.map(function (fid) {
+	                var f = file.load({ id: fid });
+	                var contents = f.getContents();
+	                var rtn = conn_1.upload({ file: f });
+	                f.folder = NS_TEST_DONE_FOLDER;
+	                f.save();
+	            });
+	            // const rtn = conn.list({ path: '/', sort: sftp.Sort.DATE_DESC })
+	            // Object.keys(rtn).map((idx) => {
+	            //   const { directory, name, size, lastModified } = rtn[idx]
+	            //   if (!directory) {
+	            //     const f = conn.download({ filename: `${name}` })
+	            //     log.debug('file', f)
+	            //     f.folder = NS_TEST_FOLDER
+	            //     f.save()
+	            //   }
+	            // })
+	        }
+	        catch (e) {
+	            log.error('CPC:MISCS:SFTP:SKD', { e: e });
+	        }
+	    };
+	    exports.execute = execute;
 	}
 
 	/**
@@ -178,8 +263,26 @@ define(['N/search', 'N/record', "N/ui/dialog", "N/format", 'N/error', 'N/email',
 	 * 
 	 * 
 	 */
-	function proError() {
+	function proError(e, sendEmailFlag) {
+		log.error(' エラー　メッセージ　：', e.message);
 		
+		if(sendEmailFlag){
+			let script = runtime.getCurrentScript();
+			let script_id = script.id;
+	        let paramEmailAuthor = script.getParameter({name: "custscript_sw_pay_author"});
+			let paramErrRecipients = script.getParameter({name: "custscript_sw_pay_recipients"});
+			let subjectContents = 'subject_contents';
+	        let bodyContents = 'An error occurred with the following information:\n' +
+	                   'Error code: ' + e.name + '\n' +
+	                   'Error msg: ' + e.message;
+
+	        email.send({
+	            author: paramEmailAuthor,
+	            recipients: paramErrRecipients,
+	            subject: subjectContents,
+	            body: bodyContents
+	        });
+		}
 	}
 	
 	/**
@@ -204,8 +307,24 @@ define(['N/search', 'N/record', "N/ui/dialog", "N/format", 'N/error', 'N/email',
 	 * 
 	 * @returns {Boolean}
 	 */
-	function dataExists() {
+	function dataExists(searchType, searchFilters) {
 		
+		let resultList = [];
+        let resultIndex = 0;
+        let resultStep = 1000;
+
+        let objSearch = search.create({
+            type : searchType,
+            filters : searchFilters,
+            columns: [
+                      search.createColumn({name: "internalid"})
+                     ]
+        });
+        
+        let searchResultCount = objSearch.runPaged().count;
+        
+        searchResultCount == 0 ? return false : return true;
+	
 	}
 	
 	/**
