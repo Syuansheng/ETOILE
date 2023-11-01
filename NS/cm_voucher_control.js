@@ -22,13 +22,16 @@ define(['N/record'],
             let newRec = scriptContext.newRecord;
             let recordType = scriptContext.newRecord.type;
             let type = scriptContext.type;
+            //発注書以外の場合はチェック不要
             if (recordType != record.Type.PURCHASE_ORDER) return;
-            if (newRec.getValue({fieldId:"createdfrom"})) return;
-            if (type == 'create' ) {
+            // 直送の場合はチェック不要
+            if (newRec.getValue({fieldId: "createdfrom"})) return;
+            if (type == 'create') {
                 let count = newRec.getLineCount({sublistId: "item"});
                 for (let i = 0; i < count; i++) {
                     let itemType = newRec.getSublistValue({sublistId: "item", fieldId: "itemtype", line: i});
                     let location = newRec.getSublistValue({sublistId: "item", fieldId: "location", line: i});
+                    //在庫アイテムの場合は倉庫を入力されていない場合はエラーにする
                     if (itemType == "InvtPart" && !location) {
                         throw "在庫品の場合は、入庫する倉庫を選択してください";
                     }
@@ -48,51 +51,34 @@ define(['N/record'],
             let recordType = scriptContext.newRecord.type;
             let recordId = scriptContext.newRecord.id;
             let type = scriptContext.type;
-            log.audit("type",type );
             try {
+                // 発注書作成、CSVインポート、直送の時
                 if (type == 'create' || type == 'dropship') {
                     let newRec = record.load({type: recordType, id: recordId, isDynamic: true});
                     let count = newRec.getLineCount({sublistId: "item"});
+                    // 明細行に5行以下の場合は処理終了
                     if (count <= 5) return;
-                    let num = count % 5 !== 0 ? Math.floor(count / 5)  : count / 5;
+                    let num = count % 5 !== 0 ? Math.floor(count / 5) : count / 5;
                     let line = 1;
+                    // 明細行に5行超えた場合は、新しい発注書に分ける
                     for (let i = 0; i < num; i++) {
                         let copyRec = record.copy({type: recordType, id: recordId, isDynamic: true});
                         let count = copyRec.getLineCount({sublistId: "item"});
-                        for (let j = count -1; j >= 0; j--) {
-                            // let itemType =  copyRec.getSublistValue({sublistId:"item",fieldId:"itemtype",line:j})
+                        for (let j = count - 1; j >= 0; j--) {
                             let currentLine = j;
                             let lineStart = line * 5;
                             let lineEnd = line * 5 + 4;
-                                // if (itemType != 'InvtPart' && itemType != 'NonInvtPart'){
-                                //     copyRec.removeLine({sublistId: "item", line: j});
-                                //     lineStart =  lineStart + 1 ;
-                                //     lineEnd = lineEnd +1;
-                                // }
-                            if (lineStart > currentLine || lineEnd < currentLine ) {
-                                    copyRec.removeLine({sublistId: "item", line: j})
+                            if (lineStart > currentLine || lineEnd < currentLine) {
+                                copyRec.removeLine({sublistId: "item", line: j});
                             }
                         }
                         line++;
                         copyRec.save();
                     }
-
-                    // let  numCount = 0
-                    // for (let i = 0; i < count; i++) {
-                    //     let itemType =  newRec.getSublistValue({sublistId:"item",fieldId:"itemtype",line:i});
-                    //     if (  i < 5 ){
-                    //         if (itemType != 'InvtPart' && itemType != 'NonInvtPart'){
-                    //             numCount++;
-                    //         }
-                    //     }
-                    // }
-                    for (let i = count -1; i >= 0; i--) {
-                        // let itemType =  newRec.getSublistValue({sublistId:"item",fieldId:"itemtype",line:i})
-                        // if ( i > 4  + numCount) {
-                        if ( i > 4  ) {
-                            // if (itemType == 'InvtPart' || itemType == 'NonInvtPart'){
-                                newRec.removeLine({sublistId: "item", line: i})
-                            // }
+                    // 元の発注書に明細行が5行まで保留する
+                    for (let i = count - 1; i >= 0; i--) {
+                        if (i > 4) {
+                            newRec.removeLine({sublistId: "item", line: i})
                         }
                     }
                     newRec.save();
