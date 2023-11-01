@@ -1,6 +1,6 @@
 /**
- *  �@�\: �d���`�[�s����
- *  Author: �v����
+ *  機能: 仕入伝票行制御
+ *  Author: 宋金来
  *  Date : 2023/10/26
  *
  * @NApiVersion 2.1
@@ -30,7 +30,7 @@ define(['N/record'],
                     let itemType = newRec.getSublistValue({sublistId: "item", fieldId: "itemtype", line: i});
                     let location = newRec.getSublistValue({sublistId: "item", fieldId: "location", line: i});
                     if (itemType == "InvtPart" && !location) {
-                        throw "�݌ɕi�̏ꍇ�́A���ɂ���q�ɂ�I�����Ă�������";
+                        throw "在庫品の場合は、入庫する倉庫を選択してください";
                     }
                 }
             }
