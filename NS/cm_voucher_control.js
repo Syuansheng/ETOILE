@@ -22,7 +22,7 @@ define(['N/record'],
             let newRec = scriptContext.newRecord;
             let recordType = scriptContext.newRecord.type;
             let type = scriptContext.type;
-            //発注書以外の場合はチェック不要
+            // 発注書以外の場合はチェック不要
             if (recordType != record.Type.PURCHASE_ORDER) return;
             // 直送の場合はチェック不要
             if (newRec.getValue({fieldId: "createdfrom"})) return;
@@ -31,7 +31,7 @@ define(['N/record'],
                 for (let i = 0; i < count; i++) {
                     let itemType = newRec.getSublistValue({sublistId: "item", fieldId: "itemtype", line: i});
                     let location = newRec.getSublistValue({sublistId: "item", fieldId: "location", line: i});
-                    //在庫アイテムの場合は倉庫を入力されていない場合はエラーにする
+                    // 在庫アイテムの場合は倉庫を入力されていない場合はエラーにする
                     if (itemType == "InvtPart" && !location) {
                         throw "在庫品の場合は、入庫する倉庫を選択してください";
                     }
